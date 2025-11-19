@@ -1,0 +1,538 @@
+<!-- START OF FILE ai_studio_code (Final_Fixed).html -->
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>九宫玄机-六色御木版</title>
+    <style>
+        body {
+            margin: 0; overflow: hidden; background-color: #0d0d0d;
+            font-family: "Microsoft YaHei", 'Segoe UI', sans-serif; 
+            user-select: none; -webkit-tap-highlight-color: transparent;
+        }
+        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; z-index: 10; }
+        h1 { 
+            margin: 0; color: #d4af37; 
+            letter-spacing: 4px; font-size: 28px; font-weight: 400;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            border-bottom: 1px solid rgba(212, 175, 55, 0.3); padding-bottom: 5px;
+        }
+        p { font-size: 12px; color: #886b4b; margin: 5px 0 10px 0; letter-spacing: 1px; }
+
+        .color-legend { display: flex; gap: 5px; margin-top: 8px; }
+        .legend-dot { width: 10px; height: 10px; border-radius: 2px; border: 1px solid #444; }
+        
+        .controls {
+            position: absolute; bottom: 30px; width: 100%;
+            display: flex; justify-content: center; gap: 20px;
+            pointer-events: auto; z-index: 20;
+        }
+        /* 通用按钮样式 */
+        button {
+            background: rgba(20, 20, 20, 0.9); backdrop-filter: blur(10px);
+            border: 1px solid #5c4033; color: #d4af37;
+            padding: 12px 30px; font-size: 14px; border-radius: 4px; 
+            cursor: pointer; transition: 0.3s; text-transform: uppercase; letter-spacing: 2px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            outline: none;
+        }
+        button:hover { background: #2a1d15; border-color: #d4af37; box-shadow: 0 0 15px rgba(212, 175, 55, 0.2); }
+        button:active { transform: scale(0.95); }
+        
+        /* 胜利界面 */
+        #victory-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s ease; z-index: 50; /* 提高层级 */
+            background: rgba(0,0,0,0.85);
+        }
+        #victory-overlay.show { opacity: 1; pointer-events: auto; }
+        
+        .win-text {
+            font-size: 60px; font-weight: 300; color: #d4af37; font-family: serif;
+            text-shadow: 0 0 30px rgba(212, 175, 55, 0.6); letter-spacing: 10px;
+            border-top: 2px solid #d4af37; border-bottom: 2px solid #d4af37; 
+            padding: 20px 0; margin-bottom: 40px;
+            background: linear-gradient(90deg, transparent, rgba(212, 175, 55, 0.1), transparent);
+            width: 100%; text-align: center;
+        }
+        .win-btn-group { display: flex; gap: 20px; }
+
+        #sound-menu {
+            position: absolute; bottom: 90px; left: 50%;
+            transform: translateX(-50%) scale(0);
+            background: rgba(25, 15, 10, 0.98);
+            border: 1px solid #5c4033; padding: 15px; border-radius: 4px;
+            display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+            transition: 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto; width: 340px; z-index: 30;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.8); transform-origin: bottom center;
+        }
+        #sound-menu.open { transform: translateX(-50%) scale(1); }
+        .sound-item {
+            background: #1a100b; padding: 10px 5px; border-radius: 2px;
+            text-align: center; color: #aa8866; font-size: 12px;
+            cursor: pointer; border: 1px solid transparent; transition: 0.2s;
+        }
+        .sound-item:hover { background: #3e2b20; color: #d4af37; }
+        .sound-item.active { background: #5c4033; color: #fff; border-color: #d4af37; }
+
+        #confetti-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 12; }
+    </style>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <div id="ui">
+        <h1>九宫玄机</h1>
+        <p>Royal Wood Edition<br>
+        Made by Catchase
+        </p>
+        <div class="color-legend">
+            <div class="legend-dot" style="background:#e6e6e6"></div>
+            <div class="legend-dot" style="background:#ffd700"></div>
+            <div class="legend-dot" style="background:#b90000"></div>
+            <div class="legend-dot" style="background:#ff5900"></div>
+            <div class="legend-dot" style="background:#009e60"></div>
+            <div class="legend-dot" style="background:#0045ad"></div>
+        </div>
+    </div>
+
+    <div id="victory-overlay">
+        <div class="win-text">乾坤定矣</div>
+        <div class="win-btn-group">
+            <!-- 关键修改：event.stopPropagation() 防止点击穿透 -->
+            <button onclick="event.stopPropagation(); game.reset()" style="border-color: #d4af37;">
+                ⟲ 归位 (初始状态)
+            </button>
+            <button onclick="event.stopPropagation(); game.shuffle()" style="background: rgba(212, 175, 55, 0.2);">
+                🔀 再破一阵
+            </button>
+        </div>
+    </div>
+
+    <div id="sound-menu">
+        <div class="sound-item active" onclick="audioMgr.set('wood')">🪵 古木</div>
+        <div class="sound-item" onclick="audioMgr.set('heavy')">🗿 重击</div>
+        <div class="sound-item" onclick="audioMgr.set('mute')">🔇 静音</div>
+    </div>
+
+    <div class="controls">
+        <button onclick="event.stopPropagation(); toggleMenu()">🎵 音效设定</button>
+        <button onclick="event.stopPropagation(); game.shuffle()">🔀 打乱阵法</button>
+    </div>
+
+<script>
+/* 音频引擎 */
+class SoundEngine {
+    constructor() {
+        this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+        this.type = 'wood'; 
+        this.inited = false;
+    }
+    init() { if(!this.inited) { this.ctx.resume(); this.inited = true; } }
+    set(key) {
+        event.stopPropagation(); 
+        this.type = key;
+        this.init();
+        document.querySelectorAll('.sound-item').forEach(el => el.classList.remove('active'));
+        const items = Array.from(document.querySelectorAll('.sound-item'));
+        const target = items.find(el => el.getAttribute('onclick').includes(`'${key}'`));
+        if(target) target.classList.add('active');
+        if(key !== 'mute') this.play();
+    }
+    play() {
+        if(this.type === 'mute') return;
+        this.init();
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+
+        switch(this.type) {
+            case 'wood': 
+                const wOsc = this.ctx.createOscillator(); wOsc.type = 'sine';
+                wOsc.frequency.setValueAtTime(100, t); wOsc.frequency.exponentialRampToValueAtTime(50, t + 0.1);
+                gain.gain.setValueAtTime(0.8, t); gain.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
+                wOsc.connect(gain); wOsc.start(t); wOsc.stop(t + 0.15);
+                break;
+            default:
+                osc.type='triangle'; osc.frequency.setValueAtTime(300,t); osc.frequency.exponentialRampToValueAtTime(50,t+0.1); 
+                gain.gain.setValueAtTime(0.3,t); gain.gain.exponentialRampToValueAtTime(0.01,t+0.1); 
+                osc.start(t); osc.stop(t+0.1); break;
+        }
+    }
+    playWin() {
+        if(this.type==='mute')return; this.init(); const t=this.ctx.currentTime;
+        [261,329,392,523,659].forEach((f,i)=>{
+            const o=this.ctx.createOscillator();const g=this.ctx.createGain();o.type='triangle';o.frequency.value=f;o.connect(g).connect(this.ctx.destination);
+            g.gain.setValueAtTime(0,t+i*0.15);g.gain.linearRampToValueAtTime(0.2,t+i*0.15+0.05);g.gain.exponentialRampToValueAtTime(0.001,t+i*0.15+2.0);
+            o.start(t+i*0.15);o.stop(t+i*0.15+2.5);
+        });
+    }
+}
+const audioMgr = new SoundEngine();
+
+/* 特效 */
+class Celebration {
+    constructor() {
+        this.canvas = document.getElementById('confetti-canvas');
+        this.ctx = this.canvas.getContext('2d');
+        this.particles = []; this.active = false;
+        this.resize(); window.addEventListener('resize', ()=>this.resize());
+        this.loop();
+    }
+    resize() { this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight; }
+    fire() {
+        this.active = true;
+        for(let i=0; i<120; i++) this.particles.push({
+            x:Math.random()*this.canvas.width, y:-10,
+            vx:(Math.random()-0.5)*2, vy:Math.random()*5+2,
+            color:`hsl(${40 + Math.random()*20}, 100%, ${50 + Math.random()*30}%)`,
+            rot:Math.random()*360, vRot:(Math.random()-0.5)*10, size:Math.random()*6+3
+        });
+    }
+    loop() {
+        requestAnimationFrame(()=>this.loop());
+        this.ctx.clearRect(0,0,this.canvas.width,this.canvas.height);
+        if(this.particles.length===0 && !this.active) return;
+        for(let i=this.particles.length-1; i>=0; i--) {
+            let p = this.particles[i];
+            p.y += p.vy; p.x += p.vx; p.rot += p.vRot;
+            this.ctx.save(); this.ctx.translate(p.x, p.y); this.ctx.rotate(p.rot*Math.PI/180);
+            this.ctx.fillStyle=p.color; this.ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size); this.ctx.restore();
+            if(p.y>this.canvas.height) this.particles.splice(i,1);
+        }
+    }
+}
+const celebrate = new Celebration();
+
+/* 纹理生成器 */
+const TextureFactory = {
+    cache: {},
+    createTintedWood: function(colorHex, isInner = false) {
+        const cacheKey = colorHex + (isInner ? '_in' : '_out');
+        if(this.cache[cacheKey]) return this.cache[cacheKey];
+
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size; canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        
+        const col = new THREE.Color(colorHex);
+        
+        if(isInner) {
+            ctx.fillStyle = '#1a120b'; 
+        } else {
+            ctx.fillStyle = `rgb(${col.r*200}, ${col.g*200}, ${col.b*200})`; 
+        }
+        ctx.fillRect(0,0,size,size);
+
+        ctx.globalAlpha = 0.2;
+        ctx.globalCompositeOperation = 'multiply'; 
+        for(let i=0; i<10000; i++) {
+            ctx.fillStyle = Math.random() > 0.5 ? '#000' : '#5c4033';
+            const x = Math.random() * size;
+            const y = Math.random() * size;
+            const w = Math.random() * 60 + 10; 
+            const h = Math.random() * 2 + 0.5;
+            ctx.fillRect(x, y, w, h);
+        }
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+
+        if(!isInner) {
+            const grad = ctx.createRadialGradient(size/2, size/2, size*0.4, size/2, size/2, size*0.8);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.85, 'rgba(0,0,0,0.2)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.6)'); 
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,size,size);
+
+            const pad = 20;
+            const r = 60; 
+            ctx.beginPath();
+            ctx.moveTo(pad + r, pad);
+            ctx.arcTo(size-pad, pad, size-pad, size-pad, r);
+            ctx.arcTo(size-pad, size-pad, pad, size-pad, r);
+            ctx.arcTo(pad, size-pad, pad, pad, r);
+            ctx.arcTo(pad, pad, size-pad, pad, r);
+            ctx.closePath();
+            
+            ctx.lineWidth = 12;
+            ctx.strokeStyle = '#d4af37'; 
+            ctx.stroke();
+            
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            
+            const mid = size/2;
+            const step = 35;
+            ctx.beginPath();
+            ctx.rect(mid-step*2, mid-step*2, step*4, step*4);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(mid, mid-step*3); ctx.lineTo(mid, mid+step*3);
+            ctx.moveTo(mid-step*3, mid); ctx.lineTo(mid+step*3, mid);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(mid, mid-step*1.5);
+            ctx.lineTo(mid+step*1.5, mid);
+            ctx.lineTo(mid, mid+step*1.5);
+            ctx.lineTo(mid-step*1.5, mid);
+            ctx.stroke();
+        } else {
+            const grad = ctx.createRadialGradient(size/2, size/2, size*0.2, size/2, size/2, size*0.9);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,size,size);
+        }
+
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.anisotropy = 4;
+        this.cache[cacheKey] = texture;
+        return texture;
+    }
+};
+
+/* 游戏核心 */
+class CoreGame {
+    constructor() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0d0d0d);
+        this.scene.fog = new THREE.Fog(0x0d0d0d, 5, 15);
+
+        this.camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+        this.camera.position.set(6.5, 5.5, 7.5); 
+        
+        this.renderer = new THREE.WebGLRenderer({antialias:true, alpha:true});
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.outputEncoding = THREE.sRGBEncoding;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        document.body.appendChild(this.renderer.domElement);
+
+        const amb = new THREE.AmbientLight(0xffffff, 0.5);
+        this.scene.add(amb);
+        const dir = new THREE.DirectionalLight(0xffeeb1, 1.2);
+        dir.position.set(5, 10, 5); dir.castShadow = true;
+        dir.shadow.mapSize.width = 2048; dir.shadow.mapSize.height = 2048;
+        this.scene.add(dir);
+        const fill = new THREE.PointLight(0x4455ff, 0.3);
+        fill.position.set(-5, 2, -5);
+        this.scene.add(fill);
+
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+
+        this.blocks = [];
+        this.gap = new THREE.Vector3(1,1,1);
+        this.animating = false;
+        this.isDragging = false;
+        this.startMouse = new THREE.Vector2();
+
+        this.colors = {
+            U: 0xe6e6e6, D: 0xffd700, R: 0xb90000, L: 0xff5900, F: 0x009e60, B: 0x0045ad, IN: 0x1a120b
+        };
+
+        this.materials = {};
+        Object.keys(this.colors).forEach(key => {
+            const isInner = key === 'IN';
+            const tex = TextureFactory.createTintedWood(this.colors[key], isInner);
+            this.materials[key] = new THREE.MeshStandardMaterial({
+                map: tex, color: 0xffffff, roughness: isInner ? 0.8 : 0.2,
+                metalness: isInner ? 0.0 : 0.1, bumpMap: tex, bumpScale: 0.01
+            });
+        });
+        
+        this.coreMat = new THREE.MeshStandardMaterial({
+            map: TextureFactory.createTintedWood('#aa00ff', false),
+            color: 0xffffff, roughness: 0.2, metalness: 0.4, emissive: 0x220044
+        });
+
+        this.initLevel();
+        this.setupEvents();
+        this.animate();
+
+        window.addEventListener('resize', ()=>{
+            this.camera.aspect = window.innerWidth/window.innerHeight;
+            this.camera.updateProjectionMatrix();
+            this.renderer.setSize(window.innerWidth, window.innerHeight);
+            celebrate.resize();
+        });
+    }
+
+    setupEvents() {
+        window.addEventListener('pointerdown', (e) => {
+            this.isDragging = false;
+            this.startMouse.set(e.clientX, e.clientY);
+        });
+        window.addEventListener('pointermove', (e) => {
+            const dist = Math.hypot(e.clientX - this.startMouse.x, e.clientY - this.startMouse.y);
+            if(dist > 5) this.isDragging = true;
+        });
+        window.addEventListener('pointerup', (e) => {
+            if(this.isDragging) return; 
+            this.onClick(e);
+        });
+    }
+
+    initLevel() {
+        this.blocks.forEach(b=>this.scene.remove(b.mesh));
+        this.blocks = [];
+        
+        const geo = new THREE.BoxGeometry(0.96, 0.96, 0.96);
+        
+        for(let z=-1; z<=1; z++) {
+            for(let y=-1; y<=1; y++) {
+                for(let x=-1; x<=1; x++) {
+                    if(x===1 && y===1 && z===1) { this.gap.set(1,1,1); continue; }
+
+                    let mesh, isCore = false;
+
+                    if(x===0 && y===0 && z===0) {
+                        isCore = true;
+                        const cGeo = new THREE.BoxGeometry(0.75, 0.75, 0.75);
+                        mesh = new THREE.Mesh(cGeo, this.coreMat);
+                        mesh.add(new THREE.PointLight(0xaa00ff, 1, 3));
+                    } else {
+                        const mats = [
+                            x === 1  ? this.materials.R : this.materials.IN,
+                            x === -1 ? this.materials.L : this.materials.IN,
+                            y === 1  ? this.materials.U : this.materials.IN,
+                            y === -1 ? this.materials.D : this.materials.IN,
+                            z === 1  ? this.materials.F : this.materials.IN,
+                            z === -1 ? this.materials.B : this.materials.IN
+                        ];
+                        mesh = new THREE.Mesh(geo, mats);
+                    }
+
+                    mesh.position.set(x,y,z);
+                    mesh.castShadow = true; mesh.receiveShadow = true;
+                    this.scene.add(mesh);
+                    this.blocks.push({mesh:mesh, isCore:isCore, solved:new THREE.Vector3(x,y,z)});
+                }
+            }
+        }
+    }
+
+    onClick(e) {
+        // 增强的点击防护：如果胜利界面开着，不允许点击方块
+        if(document.getElementById('victory-overlay').classList.contains('show')) return;
+        if(e.target.closest('#sound-menu') || e.target.closest('.controls')) return;
+        
+        document.getElementById('sound-menu').classList.remove('open');
+        if(this.animating) return;
+        
+        const mouse = new THREE.Vector2(
+            (e.clientX/window.innerWidth)*2-1,
+            -(e.clientY/window.innerHeight)*2+1
+        );
+        const ray = new THREE.Raycaster();
+        ray.setFromCamera(mouse, this.camera);
+        const hits = ray.intersectObjects(this.blocks.map(b=>b.mesh));
+        
+        if(hits.length>0) {
+            const blk = this.blocks.find(b=>b.mesh === hits[0].object);
+            if(blk) this.move(blk);
+        }
+    }
+
+    move(blk) {
+        const dist = blk.mesh.position.distanceTo(this.gap);
+        if(dist > 0.9 && dist < 1.1) {
+            audioMgr.play();
+            this.animating = true;
+            const target = this.gap.clone();
+            this.gap.copy(blk.mesh.position);
+            
+            new TWEEN.Tween(blk.mesh.position).to(target, 150)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .onComplete(()=>{
+                    this.animating = false;
+                    this.checkWin();
+                }).start();
+        }
+    }
+
+    // 修改后的 Reset：强制重置，不留后患
+    reset() {
+        // 1. 强制关闭动画系统
+        TWEEN.removeAll();
+        this.animating = false;
+
+        // 2. 强制隐藏UI (关键)
+        const overlay = document.getElementById('victory-overlay');
+        overlay.classList.remove('show');
+
+        // 3. 重置方块
+        this.initLevel();
+    }
+
+    // 新增：打乱重玩
+    shuffle() {
+        this.reset(); // 先重置到干净状态
+        
+        let steps = 50;
+        const run = () => {
+            if(steps<=0) return;
+            const n = this.blocks.filter(b => b.mesh.position.distanceTo(this.gap)<1.1);
+            if(n.length) {
+                const r = n[Math.floor(Math.random()*n.length)];
+                const t = this.gap.clone();
+                this.gap.copy(r.mesh.position);
+                r.mesh.position.copy(t);
+            }
+            steps--;
+            setTimeout(run, 15);
+        };
+        run();
+    }
+
+    checkWin() {
+        // 只有非动画状态才检查，防止误判
+        if(this.animating) return; 
+        
+        let win = true;
+        for(let b of this.blocks) {
+            if(b.mesh.position.distanceTo(b.solved) > 0.1) { win=false; break; }
+        }
+        if(win) {
+            document.getElementById('victory-overlay').classList.add('show');
+            audioMgr.playWin();
+            celebrate.fire();
+        }
+    }
+
+    animate() {
+        requestAnimationFrame(()=>this.animate());
+        TWEEN.update();
+        this.controls.update();
+        
+        const core = this.blocks.find(b=>b.isCore);
+        if(core) {
+            core.mesh.rotation.y += 0.01;
+            core.mesh.rotation.z = Math.sin(Date.now()*0.001)*0.1;
+        }
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+function toggleMenu() {
+    document.getElementById('sound-menu').classList.toggle('open');
+}
+
+const game = new CoreGame();
+</script>
+</body>
+</html>
